@@ -1,7 +1,7 @@
 (ns rest-api-demo.core
   (:require [org.httpkit.server :as server]
             [compojure.core :refer :all]
-            [compojure.rout :as route]
+            [compojure.route :as route]
             [ring.middleware.defaults :refer :all]
             [clojure.pprint :as pp]
             [clojure.string :as str]
@@ -9,13 +9,65 @@
 
   (:gen-class))
 
-(defrouts app-routes
+; Simple body page
+(defn simple-body-page [req]
+  {:status 200
+   :headers {"Content-Type" "text/html"}
+   :body "Hello World"})
+
+; Request example
+(defn request-example [req]
+  {:status 200
+   :headers {"Content-Type" "json"}
+   :body (->>
+          (pp/pprint req)
+          (str "Request Object: " req))})
+
+(defn hello-name [req]
+  {:status 200
+   :headers {"Content-Type" "text/html"}
+   :body (->
+          (pp/pprint req)
+          (str "Hello " (:name (:params req))))})
+
+; my people-collection mutable collection vector
+(def people-collection (atom []))
+
+; Collection Helper functions to add a new person
+(defn addperson [firstname surname]
+  (swap! people-collection conj {:firstname (str/capitalize firstname) :surname (str/capitalize surname)}))
+
+; Example JSON objects
+(addperson "Functional" "Human")
+(addperson "Mickey" "Mouse")
+
+; Return a JSON list of people
+(defn people-handler [req]
+  {:status 200
+   :headers {"Content-Type" "text/html"}
+   :body (str (json/write-str @people-collection))})
+
+; Get params specified by propname from :params object in req
+(defn getparameter [req propname] (get (:params req) propname))
+
+; Add a new person to the collection
+(defn addperson-handler [req]
+  {:status 200
+   :headers {"Content-Type" "text/json"}
+   :body (-> (let [p (partial getparameter req)]
+               (str (json/write-str (addperson (p :firstname) (p :surname))))))})
+
+
+; ROUTES
+(defroutes app-routes
   (GET "/" [] simple-body-page)
   (GET "/request" [] request-example)
+  (GET "/hello" [] hello-name)
+  (GET "/people" [] people-handler)
+  (GET "/people/add" [] addperson-handler)
   (route/not-found "Error, page not found!"))
 
-
-
+; APP
 (defn -main
   "This is our main entry point."
   [& args]
